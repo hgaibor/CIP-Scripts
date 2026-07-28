@@ -44,6 +44,11 @@ function queryDb($db, $sql) {
     }
 }
 
+// PHP 8+ Safe Trim Function (Guarantees no nulls reach native trim)
+function safe_trim($value) {
+    return trim((string)$value);
+}
+
 // Random Password Generator (Alphanumeric)
 function generateRandomPassword($length = 16) {
     $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -136,13 +141,14 @@ $coreSql = "SELECT extension, name AS display_name FROM users";
 $coreRecords = queryDb($db, $coreSql);
 
 foreach ($coreRecords as $row) {
-    $ext = trim((string)$row['extension']); 
+    $ext = safe_trim($row['extension']); 
     
-    $data[$ext] = $rowTemplate;
-    $data[$ext]['Extension'] = $ext;
-    $data[$ext]['Internal Caller ID Number'] = $ext;
-    // Explicit string cast to prevent PHP 8 null deprecation errors
-    $data[$ext]['Internal Caller ID Name'] = trim((string)$row['display_name']);
+    if ($ext !== '') {
+        $data[$ext] = $rowTemplate;
+        $data[$ext]['Extension'] = $ext;
+        $data[$ext]['Internal Caller ID Number'] = $ext;
+        $data[$ext]['Internal Caller ID Name'] = safe_trim($row['display_name']);
+    }
 }
 
 // 3. Parse /etc/asterisk/voicemail.conf to extract detailed voicemail data
@@ -153,32 +159,32 @@ if (file_exists($vmFile)) {
     $lines = file($vmFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     
     foreach ($lines as $line) {
-        $line = trim((string)$line);
+        $line = safe_trim($line);
         if (strpos($line, ';') === 0 || strpos($line, '[') === 0) {
             continue;
         }
         
         if (strpos($line, '=') !== false) {
             list($mailbox, $config) = explode('=', $line, 2);
-            $mailbox = trim((string)$mailbox);
-            $configParts = explode(',', trim((string)$config));
+            $mailbox = safe_trim($mailbox);
+            $configParts = explode(',', safe_trim($config));
             
-            $pin = (isset($configParts[0]) && trim((string)$configParts[0]) !== '') ? trim((string)$configParts[0]) : generateRandomPin();
-            $email = isset($configParts[2]) ? trim((string)$configParts[2]) : '';
+            $pin = (isset($configParts[0]) && safe_trim($configParts[0]) !== '') ? safe_trim($configParts[0]) : generateRandomPin();
+            $email = isset($configParts[2]) ? safe_trim($configParts[2]) : '';
             
             $saycid = '';
             $envelope = '';
             $delete = '';
             
             if (isset($configParts[4])) {
-                $optionsStr = trim((string)$configParts[4]);
+                $optionsStr = safe_trim($configParts[4]);
                 $optionsArr = explode('|', $optionsStr);
                 
                 foreach ($optionsArr as $opt) {
                     $optParts = explode('=', $opt);
                     if (count($optParts) === 2) {
-                        $key = strtolower(trim((string)$optParts[0]));
-                        $val = strtolower(trim((string)$optParts[1]));
+                        $key = strtolower(safe_trim($optParts[0]));
+                        $val = strtolower(safe_trim($optParts[1]));
                         
                         if ($key === 'saycid') $saycid = $val;
                         if ($key === 'envelope') $envelope = $val;
@@ -227,56 +233,63 @@ foreach ($vmData as $ext => $vm) {
 }
 
 // 4. Query the User Management 'userman_users' table
-$userSql = "SELECT default_extension, username, fname, lname, email FROM userman_users";
+$userSql = "SELECT default_extension, fname, lname, email FROM userman_users";
 $userRecords = queryDb($db, $userSql);
 
 foreach ($userRecords as $row) {
-    $ext = trim((string)$row['default_extension']);
-    // Explicit string cast for PHP 8
-    $umEmail = trim((string)$row['email']);
-    $username = trim((string)$row['username']);
+    $ext = safe_trim($row['default_extension']);
+    $umEmail = safe_trim($row['email']);
     
-    if (!empty($ext) && array_key_exists($ext, $data)) {
-        $data[$ext]['First Name'] = trim((string)$row['fname']);
-        $data[$ext]['Last Name'] = trim((string)$row['lname']);
+    // Only process if the extension is NOT empty and matches a known core extension
+    if ($ext !== '' && array_key_exists($ext, $data)) {
+        $data[$ext]['First Name'] = safe_trim($row['fname']);
+        $data[$ext]['Last Name'] = safe_trim($row['lname']);
         
-        if (empty($data[$ext]['Email']) && !empty($umEmail)) {
+        if ($data[$ext]['Email'] === '' && $umEmail !== '') {
             $data[$ext]['Email'] = $umEmail;
         }
-    } 
-    // Standalone Userman records (without linked extensions) are now ignored completely
-    // else {
-        // $uniqueKey = 'user_' . $username;
-        // $data[$uniqueKey] = $rowTemplate;
-        // 
-        // $data[$uniqueKey]['First Name'] = trim((string)$row['fname']);
-        // $data[$uniqueKey]['Last Name'] = trim((string)$row['lname']);
-        // $data[$uniqueKey]['Email'] = $umEmail;
-        // $data[$uniqueKey]['Extension'] = 'No Extension';
-    // }
+    }
+    // Standalone users (no linked extension) are ignored.
 }
 
-// 5. Apply Logic (Names, Usernames, Passwords)
+// 5. Apply Logic (Names, Usernames, Passwords, Validations)
 foreach ($data as $key => $row) {
     
     // FALLBACK: If First and Last name are empty, try extracting them from the Display Name
-    if (empty($row['First Name']) && empty($row['Last Name']) && !empty($row['Internal Caller ID Name'])) {
+    if ($row['First Name'] === '' && $row['Last Name'] === '' && $row['Internal Caller ID Name'] !== '') {
         if ($row['Internal Caller ID Name'] !== $row['Extension']) {
-            $nameParts = explode(' ', trim((string)$row['Internal Caller ID Name']), 2);
-            $row['First Name'] = $nameParts[0];
-            $row['Last Name'] = isset($nameParts[1]) ? $nameParts[1] : '';
+            $nameParts = explode(' ', safe_trim($row['Internal Caller ID Name']), 2);
+            $row['First Name'] = safe_trim($nameParts[0]);
+            $row['Last Name'] = isset($nameParts[1]) ? safe_trim($nameParts[1]) : '';
             
             $data[$key]['First Name'] = $row['First Name'];
             $data[$key]['Last Name'] = $row['Last Name'];
         }
     }
 
+    // VALIDATION: First Name cannot be empty
+    if ($data[$key]['First Name'] === '') {
+        $data[$key]['First Name'] = $row['Extension'];
+        $row['First Name'] = $row['Extension']; 
+    }
+    
+    // VALIDATION: Last Name cannot be empty
+    if ($data[$key]['Last Name'] === '') {
+        $data[$key]['Last Name'] = '.';
+        $row['Last Name'] = '.'; 
+    }
+
+    // VALIDATION: Hardened Email Check
+    $currentEmail = safe_trim($row['Email']);
+    $isValidEmail = ($currentEmail !== '' && filter_var($currentEmail, FILTER_VALIDATE_EMAIL) !== false);
+
     // DYNAMIC USERNAME LOGIC
-    if (!empty($row['Email'])) {
-        $data[$key]['Username'] = $row['Email'];
+    if ($isValidEmail) {
+        $data[$key]['Username'] = $currentEmail;
     } else {
-        $fLetter = !empty($row['First Name']) ? substr($row['First Name'], 0, 1) : '';
-        $lName = !empty($row['Last Name']) ? $row['Last Name'] : '';
+        // Generate Username using Name and Extension if email is invalid
+        $fLetter = ($row['First Name'] !== '') ? substr($row['First Name'], 0, 1) : '';
+        $lName = ($row['Last Name'] !== '') ? $row['Last Name'] : '';
         $extVal = ($row['Extension'] !== 'No Extension') ? $row['Extension'] : '';
         
         $generatedUser = $fLetter . $lName . $extVal;
@@ -287,6 +300,16 @@ foreach ($data as $key => $row) {
         }
 
         $data[$key]['Username'] = $generatedUser;
+    }
+    
+    // VALIDATION: Assign default email if the existing one is invalid or missing
+    if (!$isValidEmail) {
+        $data[$key]['Email'] = 'noemail@noemail.com';
+        
+        // Also update the Voicemail to Email if it was enabled
+        if ($data[$key]['Voicemail Enabled'] === 'TRUE') {
+            $data[$key]['Voicemail to Email'] = 'noemail@noemail.com';
+        }
     }
     
     // RANDOM PASSWORD GENERATION
