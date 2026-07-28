@@ -10,6 +10,7 @@
 // *        
 // *    Usage:
 // *       php CIP_cloud_migration.php > CSV_FILE.csv
+// *       php CIP_cloud_migration.php # For on-screen output
 // *        
 // *       This script will export FreePBX-based systems user information info a format compatible
 // *       to be imported in ClearlyCloud, tested in FreePBX 14 + PHP 5.4 system
@@ -243,16 +244,16 @@ foreach ($userRecords as $row) {
             $data[$ext]['Email'] = $umEmail;
         }
     } 
-    else {
-        // Handle standalone Userman records
-        $uniqueKey = 'user_' . $username;
-        $data[$uniqueKey] = $rowTemplate;
-        
-        $data[$uniqueKey]['First Name'] = trim((string)$row['fname']);
-        $data[$uniqueKey]['Last Name'] = trim((string)$row['lname']);
-        $data[$uniqueKey]['Email'] = $umEmail;
-        $data[$uniqueKey]['Extension'] = 'No Extension';
-    }
+    // Standalone Userman records (without linked extensions) are now ignored completely
+    // else {
+        // $uniqueKey = 'user_' . $username;
+        // $data[$uniqueKey] = $rowTemplate;
+        // 
+        // $data[$uniqueKey]['First Name'] = trim((string)$row['fname']);
+        // $data[$uniqueKey]['Last Name'] = trim((string)$row['lname']);
+        // $data[$uniqueKey]['Email'] = $umEmail;
+        // $data[$uniqueKey]['Extension'] = 'No Extension';
+    // }
 }
 
 // 5. Apply Logic (Names, Usernames, Passwords)
