@@ -18,7 +18,6 @@
 // *        
 // ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
 
-
 if (php_sapi_name() !== 'cli') {
     die("Error: This script must be run from the command line.\n");
 }
@@ -141,7 +140,8 @@ foreach ($coreRecords as $row) {
     $data[$ext] = $rowTemplate;
     $data[$ext]['Extension'] = $ext;
     $data[$ext]['Internal Caller ID Number'] = $ext;
-    $data[$ext]['Internal Caller ID Name'] = trim($row['display_name']);
+    // Explicit string cast to prevent PHP 8 null deprecation errors
+    $data[$ext]['Internal Caller ID Name'] = trim((string)$row['display_name']);
 }
 
 // 3. Parse /etc/asterisk/voicemail.conf to extract detailed voicemail data
@@ -152,36 +152,32 @@ if (file_exists($vmFile)) {
     $lines = file($vmFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     
     foreach ($lines as $line) {
-        $line = trim($line);
+        $line = trim((string)$line);
         if (strpos($line, ';') === 0 || strpos($line, '[') === 0) {
             continue;
         }
         
         if (strpos($line, '=') !== false) {
             list($mailbox, $config) = explode('=', $line, 2);
-            $mailbox = trim($mailbox);
-            $configParts = explode(',', trim($config));
+            $mailbox = trim((string)$mailbox);
+            $configParts = explode(',', trim((string)$config));
             
-            // Extract the PIN (1st element). If missing, generate a 6-digit one.
-            $pin = (isset($configParts[0]) && trim($configParts[0]) !== '') ? trim($configParts[0]) : generateRandomPin();
+            $pin = (isset($configParts[0]) && trim((string)$configParts[0]) !== '') ? trim((string)$configParts[0]) : generateRandomPin();
+            $email = isset($configParts[2]) ? trim((string)$configParts[2]) : '';
             
-            // Extract the Email (3rd element)
-            $email = isset($configParts[2]) ? trim($configParts[2]) : '';
-            
-            // Extract the Options (5th element)
             $saycid = '';
             $envelope = '';
             $delete = '';
             
             if (isset($configParts[4])) {
-                $optionsStr = trim($configParts[4]);
+                $optionsStr = trim((string)$configParts[4]);
                 $optionsArr = explode('|', $optionsStr);
                 
                 foreach ($optionsArr as $opt) {
                     $optParts = explode('=', $opt);
                     if (count($optParts) === 2) {
-                        $key = strtolower(trim($optParts[0]));
-                        $val = strtolower(trim($optParts[1]));
+                        $key = strtolower(trim((string)$optParts[0]));
+                        $val = strtolower(trim((string)$optParts[1]));
                         
                         if ($key === 'saycid') $saycid = $val;
                         if ($key === 'envelope') $envelope = $val;
@@ -204,7 +200,6 @@ if (file_exists($vmFile)) {
 // Map parsed voicemail data to the main array
 foreach ($vmData as $ext => $vm) {
     if (array_key_exists($ext, $data)) {
-        // Set the basic Voicemail Enabled flag and requested defaults
         $data[$ext]['Voicemail Enabled'] = 'TRUE';
         $data[$ext]['Voicemail Transcription'] = 'yes';
         $data[$ext]['Voicemail Notification'] = 'yes';
@@ -213,10 +208,8 @@ foreach ($vmData as $ext => $vm) {
         $data[$ext]['Voicemail Summarize'] = 'yes';
         $data[$ext]['Voicemail Translation'] = 'no';
         
-        // Set the extracted/generated PIN
         $data[$ext]['Voicemail Pin'] = $vm['Voicemail Pin'];
         
-        // Map dynamic option toggles
         if ($vm['Voicemail Play CID'] !== '') {
             $data[$ext]['Voicemail Play CID'] = $vm['Voicemail Play CID'];
         }
@@ -227,7 +220,6 @@ foreach ($vmData as $ext => $vm) {
             $data[$ext]['Voicemail Delete after Notification'] = $vm['Voicemail Delete after Notification'];
         }
         
-        // Handle Email mapping
         $data[$ext]['Email'] = $vm['Email'];
         $data[$ext]['Voicemail to Email'] = $vm['Email'];
     }
@@ -239,14 +231,14 @@ $userRecords = queryDb($db, $userSql);
 
 foreach ($userRecords as $row) {
     $ext = trim((string)$row['default_extension']);
-    $umEmail = trim($row['email']);
-    $username = trim($row['username']);
+    // Explicit string cast for PHP 8
+    $umEmail = trim((string)$row['email']);
+    $username = trim((string)$row['username']);
     
     if (!empty($ext) && array_key_exists($ext, $data)) {
-        $data[$ext]['First Name'] = trim($row['fname']);
-        $data[$ext]['Last Name'] = trim($row['lname']);
+        $data[$ext]['First Name'] = trim((string)$row['fname']);
+        $data[$ext]['Last Name'] = trim((string)$row['lname']);
         
-        // Prioritize voicemail email, fallback to Userman email
         if (empty($data[$ext]['Email']) && !empty($umEmail)) {
             $data[$ext]['Email'] = $umEmail;
         }
@@ -256,8 +248,8 @@ foreach ($userRecords as $row) {
         $uniqueKey = 'user_' . $username;
         $data[$uniqueKey] = $rowTemplate;
         
-        $data[$uniqueKey]['First Name'] = trim($row['fname']);
-        $data[$uniqueKey]['Last Name'] = trim($row['lname']);
+        $data[$uniqueKey]['First Name'] = trim((string)$row['fname']);
+        $data[$uniqueKey]['Last Name'] = trim((string)$row['lname']);
         $data[$uniqueKey]['Email'] = $umEmail;
         $data[$uniqueKey]['Extension'] = 'No Extension';
     }
@@ -269,7 +261,7 @@ foreach ($data as $key => $row) {
     // FALLBACK: If First and Last name are empty, try extracting them from the Display Name
     if (empty($row['First Name']) && empty($row['Last Name']) && !empty($row['Internal Caller ID Name'])) {
         if ($row['Internal Caller ID Name'] !== $row['Extension']) {
-            $nameParts = explode(' ', trim($row['Internal Caller ID Name']), 2);
+            $nameParts = explode(' ', trim((string)$row['Internal Caller ID Name']), 2);
             $row['First Name'] = $nameParts[0];
             $row['Last Name'] = isset($nameParts[1]) ? $nameParts[1] : '';
             
