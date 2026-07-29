@@ -68,27 +68,27 @@ function generateRandomPin() {
 // 1. Define the full template with all required CSV headers and new default values
 $rowTemplate = array(
     'ID' => '',
-    'First Name' => '',
-    'Last Name' => '',
-    'Username' => '',
-    'Email' => '',
+    'First Name*' => '',
+    'Last Name*' => '',
+    'Username*' => '',
+    'Email*' => '',
     'Time Zone' => '',
-    'Web Password' => '',
-    'SIP Password' => '',
+    'Web Password*' => '',
+    'SIP Password*' => '',
     'Voicemail Enabled' => '',
-    'Voicemail Pin' => '',
+    'Voicemail Pin*' => '',
     'Voicemail Play CID' => '',
     'Voicemail Play Envelope' => '',
     'Voicemail Transcription' => '',
     'Voicemail Notification' => '',
     'Voicemail Notification Use Login' => '',
-    'Extension' => '',
+    'Extension*' => '',
     'Department' => '',
-    'Language' => 'en-US',
-    'Phone Model ID' => '',
+    'Language*' => 'en-US',
+    'Phone Model ID*' => '',
     'Provisioning Template ID' => '',
     'Mac Address' => '',
-    'User Profile ID' => '',
+    'User Profile ID*' => '',
     'Forward Number' => '',
     'Followme Number' => '',
     'DND On' => '0',
@@ -145,7 +145,7 @@ foreach ($coreRecords as $row) {
     
     if ($ext !== '') {
         $data[$ext] = $rowTemplate;
-        $data[$ext]['Extension'] = $ext;
+        $data[$ext]['Extension*'] = $ext;
         $data[$ext]['Internal Caller ID Number'] = $ext;
         $data[$ext]['Internal Caller ID Name'] = safe_trim($row['display_name']);
     }
@@ -194,8 +194,8 @@ if (file_exists($vmFile)) {
             }
             
             $vmData[$mailbox] = array(
-                'Voicemail Pin' => $pin,
-                'Email' => $email,
+                'Voicemail Pin*' => $pin,
+                'Email*' => $email,
                 'Voicemail Play CID' => $saycid,
                 'Voicemail Play Envelope' => $envelope,
                 'Voicemail Delete after Notification' => $delete
@@ -215,7 +215,7 @@ foreach ($vmData as $ext => $vm) {
         $data[$ext]['Voicemail Summarize'] = 'yes';
         $data[$ext]['Voicemail Translation'] = 'no';
         
-        $data[$ext]['Voicemail Pin'] = $vm['Voicemail Pin'];
+        $data[$ext]['Voicemail Pin*'] = $vm['Voicemail Pin*'];
         
         if ($vm['Voicemail Play CID'] !== '') {
             $data[$ext]['Voicemail Play CID'] = $vm['Voicemail Play CID'];
@@ -227,8 +227,8 @@ foreach ($vmData as $ext => $vm) {
             $data[$ext]['Voicemail Delete after Notification'] = $vm['Voicemail Delete after Notification'];
         }
         
-        $data[$ext]['Email'] = $vm['Email'];
-        $data[$ext]['Voicemail to Email'] = $vm['Email'];
+        $data[$ext]['Email*'] = $vm['Email*'];
+        $data[$ext]['Voicemail to Email'] = $vm['Email*'];
     }
 }
 
@@ -242,11 +242,11 @@ foreach ($userRecords as $row) {
     
     // Only process if the extension is NOT empty and matches a known core extension
     if ($ext !== '' && array_key_exists($ext, $data)) {
-        $data[$ext]['First Name'] = safe_trim($row['fname']);
-        $data[$ext]['Last Name'] = safe_trim($row['lname']);
+        $data[$ext]['First Name*'] = safe_trim($row['fname']);
+        $data[$ext]['Last Name*'] = safe_trim($row['lname']);
         
-        if ($data[$ext]['Email'] === '' && $umEmail !== '') {
-            $data[$ext]['Email'] = $umEmail;
+        if ($data[$ext]['Email*'] === '' && $umEmail !== '') {
+            $data[$ext]['Email*'] = $umEmail;
         }
     }
     // Standalone users (no linked extension) are ignored.
@@ -256,41 +256,41 @@ foreach ($userRecords as $row) {
 foreach ($data as $key => $row) {
     
     // FALLBACK: If First and Last name are empty, try extracting them from the Display Name
-    if ($row['First Name'] === '' && $row['Last Name'] === '' && $row['Internal Caller ID Name'] !== '') {
-        if ($row['Internal Caller ID Name'] !== $row['Extension']) {
+    if ($row['First Name*'] === '' && $row['Last Name*'] === '' && $row['Internal Caller ID Name'] !== '') {
+        if ($row['Internal Caller ID Name'] !== $row['Extension*']) {
             $nameParts = explode(' ', safe_trim($row['Internal Caller ID Name']), 2);
-            $row['First Name'] = safe_trim($nameParts[0]);
-            $row['Last Name'] = isset($nameParts[1]) ? safe_trim($nameParts[1]) : '';
+            $row['First Name*'] = safe_trim($nameParts[0]);
+            $row['Last Name*'] = isset($nameParts[1]) ? safe_trim($nameParts[1]) : '';
             
-            $data[$key]['First Name'] = $row['First Name'];
-            $data[$key]['Last Name'] = $row['Last Name'];
+            $data[$key]['First Name*'] = $row['First Name*'];
+            $data[$key]['Last Name*'] = $row['Last Name*'];
         }
     }
 
     // VALIDATION: First Name cannot be empty
-    if ($data[$key]['First Name'] === '') {
-        $data[$key]['First Name'] = $row['Extension'];
-        $row['First Name'] = $row['Extension']; 
+    if ($data[$key]['First Name*'] === '') {
+        $data[$key]['First Name*'] = $row['Extension*'];
+        $row['First Name*'] = $row['Extension*']; 
     }
     
     // VALIDATION: Last Name cannot be empty
-    if ($data[$key]['Last Name'] === '') {
-        $data[$key]['Last Name'] = '.';
-        $row['Last Name'] = '.'; 
+    if ($data[$key]['Last Name*'] === '') {
+        $data[$key]['Last Name*'] = '.';
+        $row['Last Name*'] = '.'; 
     }
 
     // VALIDATION: Hardened Email Check
-    $currentEmail = safe_trim($row['Email']);
+    $currentEmail = safe_trim($row['Email*']);
     $isValidEmail = ($currentEmail !== '' && filter_var($currentEmail, FILTER_VALIDATE_EMAIL) !== false);
 
     // DYNAMIC USERNAME LOGIC
     if ($isValidEmail) {
-        $data[$key]['Username'] = $currentEmail;
+        $data[$key]['Username*'] = $currentEmail;
     } else {
         // Generate Username using Name and Extension if email is invalid
-        $fLetter = ($row['First Name'] !== '') ? substr($row['First Name'], 0, 1) : '';
-        $lName = ($row['Last Name'] !== '') ? $row['Last Name'] : '';
-        $extVal = ($row['Extension'] !== 'No Extension') ? $row['Extension'] : '';
+        $fLetter = ($row['First Name*'] !== '') ? substr($row['First Name*'], 0, 1) : '';
+        $lName = ($row['Last Name*'] !== '') ? $row['Last Name*'] : '';
+        $extVal = ($row['Extension*'] !== 'No Extension') ? $row['Extension*'] : '';
         
         $generatedUser = $fLetter . $lName . $extVal;
         $generatedUser = strtolower(str_replace(' ', '', $generatedUser));
@@ -299,12 +299,12 @@ foreach ($data as $key => $row) {
             $generatedUser = $extVal;
         }
 
-        $data[$key]['Username'] = $generatedUser;
+        $data[$key]['Username*'] = $generatedUser;
     }
     
     // VALIDATION: Assign default email if the existing one is invalid or missing
     if (!$isValidEmail) {
-        $data[$key]['Email'] = 'noemail@noemail.com';
+        $data[$key]['Email*'] = 'noemail@noemail.com';
         
         // Also update the Voicemail to Email if it was enabled
         if ($data[$key]['Voicemail Enabled'] === 'TRUE') {
@@ -313,8 +313,8 @@ foreach ($data as $key => $row) {
     }
     
     // RANDOM PASSWORD GENERATION
-    $data[$key]['Web Password'] = generateRandomPassword(16);
-    $data[$key]['SIP Password'] = generateRandomPassword(16);
+    $data[$key]['Web Password*'] = generateRandomPassword(16);
+    $data[$key]['SIP Password*'] = generateRandomPassword(16);
 }
 
 // 6. Write output to CSV
