@@ -7,19 +7,23 @@
 ## *    License: GNU/GPL3+
 ## *
 ## *    Usage:
-## *      . gdrive_download.sh [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]
+## *      . gdrive_download.sh [--fileid="<FILE_ID>" | --url="<URL>"] [--filename=<FILENAME>] [--detach]
 ## *       
 ## *      (run `chmod +x gdrive_download.sh` previously) 
-## *      ./gdrive_download.sh [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]
+## *      ./gdrive_download.sh [--fileid="<FILE_ID>" | --url="<URL>"] [--filename=<FILENAME>] [--detach]
 ## *       
 ## *      IMPORTANT: In order for the script to work, the file's shared permissions need
 ## *                 to allow the file to be downloaded publicly with no google login required.
+## *       
+## *                 To prevent URL characters to be trimmed by bash, wrap the URL or FileId in quotes.
 ## *       
 ## *    Parameters: 
 ## *      **either fileid or url are required**
 ## *      - fileid:    Google Drive ID of the file from the URL.
 ## *      - url:       Full Google Drive share link (automatically extracts the file ID).
 ## *      - filename:  (Optional) name of the file and extension to store the file locally.
+## *                   If the file is saved as 'unspecified' or some with an odd name,
+## *                   use this parameter explicitly.
 ## *      - detach:    (Optional) can launch the download in a background tmux session to allow
 ## *                   SSH client to be closed without interrupting download
 ## *      
@@ -73,7 +77,7 @@ fi
 # Validate that the file ID is provided
 if [[ -z "$FILE_ID" ]]; then
     echo "Error: Either --fileid or --url must be provided."
-    echo "Usage: $0 [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]"
+    echo "Usage: $0 [--fileid=\"<FILE_ID>\" | --url=\"<URL>\"] [--filename=<FILENAME>] [--detach]"
     return 1 2>/dev/null || exit 1
 fi
 
