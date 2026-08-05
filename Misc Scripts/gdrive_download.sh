@@ -6,40 +6,32 @@
 ## *    Date: 2026-07-31
 ## *    License: GNU/GPL3+
 ## *
-## *    Latest version: 
-## *        
-## *        
 ## *    Usage:
-## *      . gdrive_download.sh --fileid=<FILE_ID> [--filename=<FILENAME>] [--detach]
+## *      . gdrive_download.sh [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]
 ## *       
-## *      IMPORTANT: In order for the script to work, the file need shared permissions need
+## *      IMPORTANT: In order for the script to work, the file's shared permissions need
 ## *                 to allow the file to be downloaded publicly with no google login required.
 ## *       
 ## *    Parameters: 
+## *      **either fileid or url are required**
 ## *      - fileid:    Google Drive ID of the file from the URL.
-## *      - filename:  (Optional) name of the file and extension to store the file locally. 
+## *      - url:       Full Google Drive share link (automatically extracts the file ID).
+## *      - filename:  (Optional) name of the file and extension to store the file locally.
 ## *      - detach:    (Optional) can launch the download in a background tmux session to allow
 ## *                   SSH client to be closed without interrupting download
 ## *      
 ## *      This script will download files shared publicly on Google Drive automatically.  
-## *      Useful to run from a server via SSH when a customer has provided a backup file and 
+## *      Useful to run from a server via SSH when a customer has provided a backup file and  
 ## *      you don't want to get download it on your PC, then upload it via WebGUI / SCP to 
 ## *      get it to the server. 
 ## *        
-## *      It will work on both small files and large files that require to confirm to download   
+## *      It will work on both small files and large files that require to confirm to download  
 ## *        
-## *    Steps:    
-## *        
-## *      1. Get the URL from the customer, https://drive.google.com/file/d/MY_BACKUP_FILE  
-## *      2. Get the file ID (usually after the /d/ portion of the URL)
-## *      3. Place it after the --fileid= on the command and define the optional parameters. 
-## *      4. File should be downloaded directly to the server while you take a siesta.
-## *      
-## *      
 ## ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
 
 # Initialize variables
 FILE_ID=""
+URL=""
 FILENAME=""
 DETACH=false
 
@@ -48,21 +40,37 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         --fileid) FILE_ID="$2"; shift 2 ;;
         --fileid=*) FILE_ID="${1#*=}"; shift 1 ;;
+        --url) URL="$2"; shift 2 ;;
+        --url=*) URL="${1#*=}"; shift 1 ;;
         --filename) FILENAME="$2"; shift 2 ;;
         --filename=*) FILENAME="${1#*=}"; shift 1 ;;
         --detach) DETACH=true; shift 1 ;;
         *)
             echo "Error: Unknown parameter passed: $1"
-            echo "Usage: $0 --fileid=<FILE_ID> [--filename=<FILENAME>] [--detach]"
+            echo "Usage: $0 [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]"
             return 1 2>/dev/null || exit 1
             ;;
     esac
 done
 
+# Extract File ID from URL if provided
+if [[ -n "$URL" ]]; then
+    # Match format: https://drive.google.com/file/d/FILE_ID/view
+    if [[ "$URL" =~ /d/([a-zA-Z0-9_-]+) ]]; then
+        FILE_ID="${BASH_REMATCH[1]}"
+    # Match format: https://drive.google.com/open?id=FILE_ID
+    elif [[ "$URL" =~ id=([a-zA-Z0-9_-]+) ]]; then
+        FILE_ID="${BASH_REMATCH[1]}"
+    else
+        echo "Error: Could not extract a valid Google Drive File ID from the provided URL."
+        return 1 2>/dev/null || exit 1
+    fi
+fi
+
 # Validate that the file ID is provided
 if [[ -z "$FILE_ID" ]]; then
-    echo "Error: --fileid is required."
-    echo "Usage: $0 --fileid=<FILE_ID> [--filename=<FILENAME>] [--detach]"
+    echo "Error: Either --fileid or --url must be provided."
+    echo "Usage: $0 [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]"
     return 1 2>/dev/null || exit 1
 fi
 
