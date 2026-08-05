@@ -9,6 +9,9 @@
 ## *    Usage:
 ## *      . gdrive_download.sh [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]
 ## *       
+## *      (run `chmod +x gdrive_download.sh` previously) 
+## *      ./gdrive_download.sh [--fileid=<FILE_ID> | --url=<URL>] [--filename=<FILENAME>] [--detach]
+## *       
 ## *      IMPORTANT: In order for the script to work, the file's shared permissions need
 ## *                 to allow the file to be downloaded publicly with no google login required.
 ## *       
